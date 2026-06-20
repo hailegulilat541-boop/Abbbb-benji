@@ -1,0 +1,6 @@
+{
+  "name": "ApexInvest - Professional Investment Platform",
+  "description": "A premium and highly secure mobile-first investment platform featuring complete English & Amharic bilingual coverage, automated payment receipt verification (CBE support), multi-level affiliate trees, and exhaustive administrator governance dashboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
