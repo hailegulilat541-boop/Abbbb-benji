@@ -501,6 +501,21 @@ export default function AuthView({ lang, authType: initialAuthType, onNavigate, 
             >
               {t.dontHaveAccount}
             </button>
+
+            <div className="mt-6 pt-5 border-t border-slate-800/80 text-center text-xs text-slate-400">
+              <span className="block mb-2 font-semibold text-slate-500">{lang === 'en' ? "🔐 Administrative Back-Office Access" : "🔐 የአስተዳዳሪ መግቢያ"}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setUsername('admin');
+                  setPassword('admin123');
+                  setRecaptchaChecked(true);
+                }}
+                className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 rounded-xl px-4 py-2 font-bold font-mono transition-all inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>🔑 {lang === 'en' ? "Fill Admin Account" : "አስተዳዳሪን አስገባ (ቅጽበታዊ)"}</span>
+              </button>
+            </div>
           </form>
         )}
 

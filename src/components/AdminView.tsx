@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { translations } from '../translations';
 import { User, DepositRequest, WithdrawalRequest, InvestmentPlan, PlatformSettings, Announcement } from '../types';
-import { Users, Wallet, TrendingUp, AlertTriangle, ShieldCheck, Check, Trash, Plus, Search, Settings, Megaphone, Eye, X, Edit, RotateCcw, HelpCircle } from 'lucide-react';
+import { Users, Wallet, TrendingUp, AlertTriangle, ShieldCheck, Check, Trash, Plus, Search, Settings, Megaphone, Eye, X, Edit, RotateCcw, HelpCircle, Download, FileSpreadsheet, Network } from 'lucide-react';
+import { ReferralTreeViewer } from './ReferralTreeViewer';
 
 interface AdminViewProps {
   lang: 'en' | 'am';
@@ -18,7 +19,7 @@ interface AdminViewProps {
   onBroadcastAnnouncement: (ann: Announcement) => void;
 }
 
-type AdminSub = 'stats' | 'users' | 'deposits' | 'withdrawals' | 'plans' | 'announcements' | 'settings';
+type AdminSub = 'stats' | 'users' | 'deposits' | 'withdrawals' | 'plans' | 'announcements' | 'settings' | 'tree';
 
 export default function AdminView({
   lang,
@@ -64,8 +65,93 @@ export default function AdminView({
   const [cfgCom3, setCfgCom3] = useState(settings.referralLevel3Com.toString());
   const [cfgRegEnabled, setCfgRegEnabled] = useState(settings.registrationEnabled);
 
+  // Admin authentication modification states
+  const [adminNewPassword, setAdminNewPassword] = useState('');
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
+
   // Screenshot viewer modal
   const [viewScreenshotImg, setViewScreenshotImg] = useState<string | null>(null);
+
+  // CSV Exporter Utilities
+  const exportToCSV = (filename: string, headers: string[], rows: (string | number)[][]) => {
+    const formatCell = (cell: any) => {
+      if (cell === null || cell === undefined) return '';
+      const str = String(cell);
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const csvContent = [
+      headers.map(formatCell).join(','),
+      ...rows.map(row => row.map(formatCell).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportUsersCSV = () => {
+    const headers = [
+      'User ID',
+      'Username',
+      'Email Address',
+      'Phone Number',
+      'Account Balance ($)',
+      'Active Investments ($)',
+      'Account Status',
+      'System Role',
+      'Registration Date',
+      'KYC Verified'
+    ];
+
+    const rows = users.map(u => [
+      u.id,
+      u.username,
+      u.email,
+      u.phone,
+      u.balance,
+      u.activeInvestment,
+      u.status,
+      u.role,
+      u.registrationDate,
+      u.isKycVerified ? 'Yes' : 'No'
+    ]);
+
+    exportToCSV('apex_users_ledger.csv', headers, rows);
+  };
+
+  const handleExportDepositsCSV = () => {
+    const headers = [
+      'Deposit Transaction ID',
+      'User ID',
+      'Username',
+      'Deposit Amount ($)',
+      'Payment Method',
+      'Creation Timestamp',
+      'Ledger Status'
+    ];
+
+    const rows = deposits.map(d => [
+      d.id,
+      d.userId,
+      d.username,
+      d.amount,
+      d.paymentMethod,
+      d.date,
+      d.status
+    ]);
+
+    exportToCSV('apex_deposits_ledger.csv', headers, rows);
+  };
 
   // Calculate stats in real-time
   const totalUsersCount = users.length;
@@ -323,6 +409,34 @@ export default function AdminView({
     alert("Configuration updated in system cache!");
   };
 
+  const handleChangeAdminPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminNewPassword) {
+      alert("Please enter a new password");
+      return;
+    }
+    if (adminNewPassword !== adminConfirmPassword) {
+      alert("New password fields do not match!");
+      return;
+    }
+
+    // Find admin user in user list and update their password
+    const updatedUsers = users.map(u => {
+      if (u.role === 'admin' || u.username === 'admin') {
+        return {
+          ...u,
+          passwordHash: adminNewPassword
+        };
+      }
+      return u;
+    });
+
+    onUpdateUsers(updatedUsers);
+    setAdminNewPassword('');
+    setAdminConfirmPassword('');
+    alert("Admin security password updated successfully in the system database!");
+  };
+
   return (
     <div className="w-full bg-[#05070f] text-slate-100 min-h-screen pb-16 flex flex-col md:flex-row">
       
@@ -350,6 +464,11 @@ export default function AdminView({
           <button onClick={() => setActiveTab('stats')} className={`w-full text-left py-3.5 px-4 rounded-xl cursor-pointer transition-all ${activeTab === 'stats' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white hover:bg-slate-900'}`}>{lang === 'en' ? 'Overview' : 'እይታ'}</button>
           <button onClick={() => setActiveTab('users')} className={`w-full text-left py-3.5 px-4 rounded-xl cursor-pointer transition-all ${activeTab === 'users' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white hover:bg-slate-900'}`}>{lang === 'en' ? 'User Directory' : 'የአባላት ደብተር'}</button>
           
+          <button onClick={() => setActiveTab('tree')} className={`w-full text-left py-3.5 px-4 rounded-xl cursor-pointer transition-all flex items-center justify-between ${activeTab === 'tree' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white hover:bg-slate-900'}`}>
+            <span>{lang === 'en' ? 'Affiliate Network Tree' : 'የግብዣ ሰንሰለት መዋቅር'}</span>
+            <Network className={`w-4 h-4 ${activeTab === 'tree' ? 'text-slate-950' : 'text-amber-400/80'}`} />
+          </button>
+          
           <button onClick={() => setActiveTab('deposits')} className={`w-full text-left py-3.5 px-4 rounded-xl cursor-pointer transition-all relative ${activeTab === 'deposits' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-400 hover:text-white hover:bg-slate-900'}`}>
             <span>{lang === 'en' ? 'Pending Deposits' : 'ጠቅላላ ገቢዎች'}</span>
             {totalPendingDeposits > 0 && <span className="absolute right-3.5 top-3.5 bg-red-500 text-white font-black text-[10px] px-2 py-0.5 rounded-full animate-bounce">{totalPendingDeposits}</span>}
@@ -372,7 +491,25 @@ export default function AdminView({
         {/* ================= ADMIN TAB: STATS ================= */}
         {activeTab === 'stats' && (
           <div className="space-y-8">
-            <h2 className="text-xl font-bold tracking-tight text-white mb-6">Secured System Dashboard Statistics</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <h2 className="text-xl font-bold tracking-tight text-white">Secured System Dashboard Statistics</h2>
+              <div className="flex flex-wrap gap-2.5">
+                <button
+                  onClick={handleExportUsersCSV}
+                  className="bg-slate-900 hover:bg-slate-850 text-amber-500 hover:text-amber-400 border border-slate-800 hover:border-amber-500/30 px-3.5 py-2 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 cursor-pointer shadow-md"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Export Users CSV</span>
+                </button>
+                <button
+                  onClick={handleExportDepositsCSV}
+                  className="bg-slate-900 hover:bg-slate-850 text-amber-500 hover:text-amber-400 border border-slate-800 hover:border-amber-500/30 px-3.5 py-2 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 cursor-pointer shadow-md"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Export Deposits CSV</span>
+                </button>
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-slate-900/40 border border-slate-850 p-6 rounded-2xl relative overflow-hidden">
@@ -430,7 +567,16 @@ export default function AdminView({
         {activeTab === 'users' && (
           <div className="space-y-8">
             <div className="bg-slate-900/40 rounded-3xl p-6 border border-slate-850">
-              <h2 className="text-xl font-bold tracking-tight text-white mb-6">Verify & Modify User Accounts Directory</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <h2 className="text-xl font-bold tracking-tight text-white">{lang === 'en' ? "Verify & Modify User Accounts Directory" : "የአባላት ዝርዝር ማስተካከያ"}</h2>
+                <button
+                  onClick={handleExportUsersCSV}
+                  className="bg-slate-950 hover:bg-slate-900 text-amber-500 hover:text-amber-400 border border-slate-800 hover:border-amber-500/30 px-3.5 py-2.5 rounded-xl text-xs font-black font-mono transition-all flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto shadow-inner"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{lang === 'en' ? "Export Users List (CSV)" : "የአባላትን ዝርዝር አውርድ"}</span>
+                </button>
+              </div>
 
               {/* Search user */}
               <div className="relative max-w-md mb-6">
@@ -621,7 +767,16 @@ export default function AdminView({
         {activeTab === 'deposits' && (
           <div className="space-y-8">
             <div className="bg-slate-900/40 rounded-3xl p-6 border border-slate-850">
-              <h2 className="text-xl font-bold tracking-tight text-white mb-6">Review Inbound Payment Ledger Requests</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <h2 className="text-xl font-bold tracking-tight text-white">{lang === 'en' ? "Review Inbound Payment Ledger Requests" : "ገቢ የክፍያ ጥያቄዎች ዝርዝር"}</h2>
+                <button
+                  onClick={handleExportDepositsCSV}
+                  className="bg-slate-950 hover:bg-slate-900 text-amber-500 hover:text-amber-400 border border-slate-800 hover:border-amber-500/30 px-3.5 py-2.5 rounded-xl text-xs font-black font-mono transition-all flex items-center justify-center gap-2 cursor-pointer self-start sm:sm:self-auto shadow-inner"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{lang === 'en' ? "Export Deposits List (CSV)" : "የገቢ ክፍያዎችን አውርድ"}</span>
+                </button>
+              </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-slate-300">
@@ -905,11 +1060,209 @@ export default function AdminView({
                 </div>
               </form>
             </div>
+
+            {/* Admin Security Password Modification Card */}
+            <div className="bg-slate-900/40 rounded-3xl p-8 border border-red-500/10">
+              <h3 className="text-sm font-black text-red-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <span>🛡️ {lang === 'en' ? "ADMINISTRATIVE CONTROL ACCESS" : "የአስተዳዳሪ ደህንነት መቆጣጠሪያ"}</span>
+              </h3>
+              <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+                {lang === 'en' 
+                  ? "Update the system security credential required to log into the administrative master portal. This live override will modify the credential database dynamically." 
+                  : "ወደ አስተዳዳሪ አጠቃላይ መቆጣጠሪያ ፖርታል ለመግባት የሚያገለግለውን የይለፍ ቃል እዚህ መቀየር ይችላሉ።"}
+              </p>
+
+              <form onSubmit={handleChangeAdminPassword} className="space-y-4 max-w-md">
+                <div>
+                  <label className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1.5">
+                    {lang === 'en' ? "New Secret Password" : "አዲሱ የይለፍ ቃል"}
+                  </label>
+                  <input 
+                    type="password" 
+                    required
+                    placeholder="••••••••"
+                    className="w-full bg-slate-950 border border-slate-850 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 font-mono tracking-widest" 
+                    value={adminNewPassword} 
+                    onChange={(e) => setAdminNewPassword(e.target.value)} 
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1.5">
+                    {lang === 'en' ? "Confirm Secret Password" : "ይለፍ ቃሉን ያረጋግጡ"}
+                  </label>
+                  <input 
+                    type="password" 
+                    required
+                    placeholder="••••••••"
+                    className="w-full bg-slate-950 border border-slate-850 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 font-mono tracking-widest" 
+                    value={adminConfirmPassword} 
+                    onChange={(e) => setAdminConfirmPassword(e.target.value)} 
+                  />
+                </div>
+
+                <div className="pt-2 text-left">
+                  <button 
+                    type="submit" 
+                    className="bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                  >
+                    {lang === 'en' ? "Modify Master Credentials" : "ይለፍ ቃሉን በቋሚነት ቀይር"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
+        )}
+
+        {/* ================= ADMIN TAB: REFERRAL TREE GRAPH ================= */}
+        {activeTab === 'tree' && (
+          <ReferralTreeViewer
+            lang={lang}
+            users={users}
+            onAddSampleNodes={handleCreateExtendedReferralsGraph}
+          />
         )}
       </main>
     </div>
   );
+
+  function handleCreateExtendedReferralsGraph() {
+    const extendedMockUsers: User[] = [
+      {
+        id: 'ref_abebe',
+        username: 'abebe',
+        email: 'abebe_growth@gmail.com',
+        phone: '+251911111111',
+        passwordHash: '123456',
+        referralCode: 'ABB1111',
+        referredBy: 'AMH5819',
+        balance: 245.50,
+        dailyProfit: 3.68,
+        referralIncome: 15.00,
+        activeInvestment: 150.00,
+        status: 'active',
+        role: 'user',
+        isEmailVerified: true,
+        isKycVerified: true,
+        registrationDate: '2026-06-12T10:00:00Z'
+      },
+      {
+        id: 'ref_chala',
+        username: 'chala',
+        email: 'chala_booster@gmail.com',
+        phone: '+251922222222',
+        passwordHash: '123456',
+        referralCode: 'CHA2222',
+        referredBy: 'AMH5819',
+        balance: 1550.00,
+        dailyProfit: 38.75,
+        referralIncome: 95.00,
+        activeInvestment: 800.00,
+        status: 'active',
+        role: 'user',
+        isEmailVerified: true,
+        isKycVerified: true,
+        registrationDate: '2026-06-13T14:30:00Z'
+      },
+      {
+        id: 'ref_aster',
+        username: 'aster',
+        email: 'aster_wealth@gmail.com',
+        phone: '+251933333333',
+        passwordHash: '123456',
+        referralCode: 'AST3333',
+        referredBy: 'ABB1111',
+        balance: 650.00,
+        dailyProfit: 16.25,
+        referralIncome: 25.00,
+        activeInvestment: 300.00,
+        status: 'active',
+        role: 'user',
+        isEmailVerified: true,
+        isKycVerified: true,
+        registrationDate: '2026-06-14T08:15:00Z'
+      },
+      {
+        id: 'ref_kebede',
+        username: 'kebede',
+        email: 'kebede_pro@gmail.com',
+        phone: '+251944444444',
+        passwordHash: '123456',
+        referralCode: 'KEB4444',
+        referredBy: 'AST3333',
+        balance: 120.00,
+        dailyProfit: 0.00,
+        referralIncome: 0.00,
+        activeInvestment: 0.00,
+        status: 'active',
+        role: 'user',
+        isEmailVerified: true,
+        isKycVerified: false,
+        registrationDate: '2026-06-15T11:45:00Z'
+      },
+      {
+        id: 'ref_martha',
+        username: 'martha',
+        email: 'martha_vip@gmail.com',
+        phone: '+251955555555',
+        passwordHash: '123456',
+        referralCode: 'MAR5555',
+        referredBy: 'CHA2222',
+        balance: 4500.00,
+        dailyProfit: 171.00,
+        referralIncome: 0.00,
+        activeInvestment: 2500.00,
+        status: 'suspended',
+        role: 'user',
+        isEmailVerified: true,
+        isKycVerified: true,
+        registrationDate: '2026-06-16T16:00:00Z'
+      },
+      {
+        id: 'ref_dawit',
+        username: 'dawit',
+        email: 'dawit_accumulate@gmail.com',
+        phone: '+251966666666',
+        passwordHash: '123456',
+        referralCode: 'DAW6666',
+        referredBy: 'KEB4444',
+        balance: 50.00,
+        dailyProfit: 0.00,
+        referralIncome: 0.00,
+        activeInvestment: 0.00,
+        status: 'active',
+        role: 'user',
+        isEmailVerified: true,
+        isKycVerified: false,
+        registrationDate: '2026-06-17T09:20:00Z'
+      },
+      {
+        id: 'ref_selam',
+        username: 'selam',
+        email: 'selam_invests@gmail.com',
+        phone: '+251977777777',
+        passwordHash: '123456',
+        referralCode: 'SEL7777',
+        referredBy: 'DAW6666',
+        balance: 2000.00,
+        dailyProfit: 50.00,
+        referralIncome: 0.00,
+        activeInvestment: 1000.00,
+        status: 'active',
+        role: 'user',
+        isEmailVerified: true,
+        isKycVerified: true,
+        registrationDate: '2026-06-18T13:10:00Z'
+      }
+    ];
+
+    const existingUsernames = new Set(users.map(u => u.username.toLowerCase()));
+    const usersToAppend = extendedMockUsers.filter(u => !existingUsernames.has(u.username.toLowerCase()));
+    
+    if (usersToAppend.length > 0) {
+      onUpdateUsers([...users, ...usersToAppend]);
+    }
+  }
 
   function handlePlanDeletionFlow(id: string) {
     if (confirm("Are you sure you want to deactivate interest reward plan tier?")) {
