@@ -24,6 +24,8 @@ const SEED_USERS: User[] = [
     role: 'user',
     withdrawalAddress: 'TRX7823yfh8234yisdhf',
     isEmailVerified: true,
+    isKycVerified: true,
+    p2pIntent: true,
     registrationDate: '2026-06-10T12:00:00Z'
   },
   {
@@ -168,6 +170,7 @@ export default function App() {
   // Notification feeds
   const [notifications, setNotifications] = useState<string[]>([]);
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
+  const [isSandboxOpen, setIsSandboxOpen] = useState(false);
 
   // Load and pre-seed databases
   useEffect(() => {
@@ -290,14 +293,15 @@ export default function App() {
   };
 
   // User Page Payout Submission callbacks
-  const handleUserDepositSubmit = (amount: number, method: string, screenshot: string) => {
+  const handleUserDepositSubmit = (amount: number, method: string, screenshot: string, userAccountNo?: string) => {
     if (!currentUser) return;
+    const finalMethod = userAccountNo ? `${method} (Acc: ${userAccountNo})` : method;
     const newDep: DepositRequest = {
       id: 'dep_' + Math.random().toString(36).substring(2, 8),
       userId: currentUser.id,
       username: currentUser.username,
       amount,
-      paymentMethod: method,
+      paymentMethod: finalMethod,
       screenshotUrl: screenshot,
       date: new Date().toISOString(),
       status: 'pending'
@@ -399,25 +403,8 @@ export default function App() {
     <div className="w-full min-h-screen bg-[#05070f] font-sans antialiased text-slate-100 flex flex-col justify-between">
       
       {/* Platform top banner (Bilingual choice / Role Switcher VIP) */}
-      <div className="bg-[#090f1d] px-6 py-2 border-b border-slate-900/40 text-xs flex flex-wrap justify-between items-center gap-3 relative z-50">
+      <div className="bg-[#090f1d] px-6 py-2 border-b border-slate-900/40 text-xs flex flex-wrap justify-end items-center gap-3 relative z-50">
         
-        {/* Floating Developer Sandbox Quick Swapper (Essential for Iframe testing) */}
-        <div className="flex items-center gap-2">
-          <span className="text-slate-500 font-bold uppercase text-[9px] tracking-wider">🔬 SANDBOX QUICK-SWAP:</span>
-          <button
-            onClick={() => handleToggleRoles('haile_investor')}
-            className={`cursor-pointer px-2 py-0.5 rounded font-black text-[10px] ${currentUser?.username === 'haile' ? 'bg-amber-500 text-slate-950 shadow' : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-850'}`}
-          >
-            Investor Flow (Haile)
-          </button>
-          <button
-            onClick={() => handleToggleRoles('admin_desk')}
-            className={`cursor-pointer px-2 py-0.5 rounded font-black text-[10px] ${currentUser?.username === 'admin' ? 'bg-amber-500 text-slate-950 shadow' : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-850'}`}
-          >
-            Platform Admin
-          </button>
-        </div>
-
         {/* Global Notifications and Language switchers */}
         <div className="flex items-center gap-6">
           
@@ -494,6 +481,7 @@ export default function App() {
           <UserView
             lang={lang}
             user={currentUser}
+            users={users}
             onNavigate={(route) => setAppRoute(route)}
             plans={plans}
             deposits={deposits}
@@ -534,6 +522,50 @@ export default function App() {
           <span>GLOBAL BROADCAST: {announcements[0].title} — {announcements[0].body}</span>
         </div>
       )}
+
+      {/* Dynamic Collapsible Bottom Sandbox Widget (Discreet & Non-intrusive) */}
+      <div className="fixed bottom-4 left-4 z-[9999] flex flex-col items-start gap-2">
+        {isSandboxOpen ? (
+          <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl shadow-2xl flex flex-col gap-2 min-w-[200px] animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-1.5">
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">🔬 Sandbox Roles</span>
+              <button 
+                onClick={() => setIsSandboxOpen(false)} 
+                className="text-slate-500 hover:text-white text-xs cursor-pointer font-bold px-1"
+                title="Minimize Sandbox Swapper"
+              >
+                ✕
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                handleToggleRoles('haile_investor');
+                setIsSandboxOpen(false);
+              }}
+              className={`w-full text-left cursor-pointer px-3 py-1.5 rounded-xl font-bold text-xs transition-all ${currentUser?.username === 'haile' ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-850/50'}`}
+            >
+              Investor Flow (Haile)
+            </button>
+            <button
+              onClick={() => {
+                handleToggleRoles('admin_desk');
+                setIsSandboxOpen(false);
+              }}
+              className={`w-full text-left cursor-pointer px-3 py-1.5 rounded-xl font-bold text-xs transition-all ${currentUser?.username === 'admin' ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-850/50'}`}
+            >
+              Platform Admin
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsSandboxOpen(true)}
+            className="w-10 h-10 rounded-full bg-slate-900/95 border border-slate-800/80 hover:border-amber-500/50 text-slate-400 hover:text-amber-500 flex items-center justify-center shadow-lg hover:shadow-amber-500/5 transition-all duration-200 cursor-pointer"
+            title="Open Sandbox Quick Swapper"
+          >
+            🔬
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -207,6 +207,15 @@ export default function AdminView({
     alert(`User status mutated to: ${nextStatus.toUpperCase()}`);
   };
 
+  // Toggle KYC state
+  const handleToggleKycUser = (user: User) => {
+    const nextKyc = !user.isKycVerified;
+    const updatedUsers = users.map(u => u.id === user.id ? { ...u, isKycVerified: nextKyc } : u);
+    onUpdateUsers(updatedUsers);
+    setSelectedUser({ ...user, isKycVerified: nextKyc });
+    alert(`User KYC status manually updated to: ${nextKyc ? 'VERIFIED' : 'UNVERIFIED'}`);
+  };
+
   // Adjust balance
   const handleAdjustBalanceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -496,6 +505,71 @@ export default function AdminView({
                     <p className="text-slate-400">Referral Code: <span className="text-amber-500 font-bold float-right">{selectedUser.referralCode}</span></p>
                     <p className="text-slate-400">Referred By: <span className="text-white float-right">{selectedUser.referredBy || 'None'}</span></p>
                     <p className="text-slate-400">Investments Active: <span className="text-white float-right">${selectedUser.activeInvestment.toFixed(2)}</span></p>
+                    <p className="text-slate-400">P2P Status: <span className={`font-black uppercase float-right ${selectedUser.isKycVerified ? 'text-emerald-400' : 'text-amber-500'}`}>{selectedUser.isKycVerified ? 'Verified KYC' : 'Unverified / Process'}</span></p>
+                  </div>
+
+                  {/* Scanned/Uploaded KYC Documents Panel */}
+                  <div className="p-4 bg-slate-950 rounded-2xl border border-slate-900 text-xs space-y-3">
+                    <h4 className="text-[10px] text-amber-500 font-extrabold uppercase font-mono tracking-wider">🔬 Captured KYC Document Feeds</h4>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Facial Scan */}
+                      <div>
+                        <span className="text-[9px] text-slate-500 uppercase font-mono block mb-1">1. Facial Scan:</span>
+                        {selectedUser.kycFacialPic ? (
+                          <div className="relative aspect-square rounded-lg overflow-hidden border border-slate-800 bg-slate-900">
+                            <img 
+                              src={selectedUser.kycFacialPic} 
+                              className="w-full h-full object-cover" 
+                              alt="Facial Capture" 
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        ) : (
+                          <div className="aspect-square rounded-lg border border-dashed border-slate-900 bg-slate-900/40 flex items-center justify-center text-center p-2 text-[10px] text-slate-600 font-mono">
+                            No biometric face scanned
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Official ID Scan */}
+                      <div>
+                        <span className="text-[9px] text-slate-500 uppercase font-mono block mb-1">2. Camera ID Scan:</span>
+                        {selectedUser.kycIdPic ? (
+                          <div className="relative aspect-square rounded-lg overflow-hidden border border-slate-800 bg-slate-900 flex items-center justify-center">
+                            {selectedUser.kycIdPic.startsWith('data:') ? (
+                              <img 
+                                src={selectedUser.kycIdPic} 
+                                className="w-full h-full object-contain bg-slate-950 p-1" 
+                                alt="National ID Scan" 
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="w-11/12 h-3/5 bg-amber-500/10 border border-amber-550/30 rounded flex flex-col items-center justify-center text-center p-1">
+                                <span className="text-[10px] font-black font-mono text-amber-500 leading-none">ID FILE</span>
+                                <span className="text-[7px] text-slate-400 mt-1 truncate max-w-full">Custom_ID_Upload</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="aspect-square rounded-lg border border-dashed border-slate-900 bg-slate-900/40 flex items-center justify-center text-center p-2 text-[10px] text-slate-600 font-mono">
+                            No ID document scanned
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleKycUser(selectedUser)}
+                      className={`w-full font-black text-[10px] py-2 rounded-lg uppercase tracking-widest cursor-pointer transition-all ${
+                        selectedUser.isKycVerified 
+                          ? 'bg-red-500/10 hover:bg-red-500/15 text-red-400 border border-red-500/20' 
+                          : 'bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+                      }`}
+                    >
+                      {selectedUser.isKycVerified ? '⚠️ Revoke KYC Verification' : '✓ Approves/Verify KYC Document Scan'}
+                    </button>
                   </div>
 
                   <div className="flex gap-4">

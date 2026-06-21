@@ -16,6 +16,10 @@ export interface User {
   withdrawalAddress?: string;
   isEmailVerified: boolean;
   registrationDate: string;
+  p2pIntent?: boolean;
+  isKycVerified?: boolean;
+  kycFacialPic?: string;
+  kycIdPic?: string;
 }
 
 export interface InvestmentPlan {

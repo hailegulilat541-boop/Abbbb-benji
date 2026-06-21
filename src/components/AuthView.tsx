@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { translations } from '../translations';
 import { User } from '../types';
-import { ShieldAlert, Eye, EyeOff, Lock, Mail, Phone, User as UserIcon, Keyboard, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, Eye, EyeOff, Lock, Mail, Phone, User as UserIcon, Keyboard, CheckCircle2, ShieldCheck, Camera } from 'lucide-react';
+import { CameraIdScanner } from './CameraIdScanner';
+import { CameraFaceScanner } from './CameraFaceScanner';
 
 interface AuthViewProps {
   lang: 'en' | 'am';
@@ -25,6 +27,16 @@ export default function AuthView({ lang, authType: initialAuthType, onNavigate, 
   const [referralCode, setReferralCode] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+
+  // P2P Intent and KYC biometric states
+  const [p2pIntent, setP2pIntent] = useState(false);
+  const [showKycScreen, setShowKycScreen] = useState(false);
+  const [kycFacialPic, setKycFacialPic] = useState('');
+  const [kycIdPic, setKycIdPic] = useState('');
+  const [facialScanning, setFacialScanning] = useState(false);
+  const [idUploading, setIdUploading] = useState(false);
+  const [showAuthIdScanner, setShowAuthIdScanner] = useState(false);
+  const [showAuthFaceScanner, setShowAuthFaceScanner] = useState(false);
 
   // Security checks
   const [showPassword, setShowPassword] = useState(false);
@@ -113,6 +125,42 @@ export default function AuthView({ lang, authType: initialAuthType, onNavigate, 
     setIsVerifying(true);
   };
 
+  const handleKycCompleteSubmit = () => {
+    if (!kycFacialPic) {
+      alert(lang === 'en' ? "Please complete biometric facial scanning." : "እባክዎን የፊት ባዮሜትሪክ ፎቶዎን ያንሱ ወይም ይምረጡ።");
+      return;
+    }
+    if (!kycIdPic) {
+      alert(lang === 'en' ? "Please upload your official ID card or Passport photo." : "እባክዎን የማንነት መለያ (ID ካርድ) ፎቶ ያስገቡ።");
+      return;
+    }
+
+    const newUser = onRegister({
+      username,
+      email,
+      phone,
+      passwordHash: password,
+      referralCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+      referredBy: referralCode || undefined,
+      balance: 10.00,
+      dailyProfit: 0,
+      referralIncome: 0,
+      activeInvestment: 0,
+      status: 'active',
+      role: 'user',
+      isEmailVerified: true,
+      registrationDate: new Date().toISOString(),
+      p2pIntent: true,
+      isKycVerified: true,
+      kycFacialPic,
+      kycIdPic
+    });
+
+    setIsVerifying(false);
+    setShowKycScreen(false);
+    onLogin(newUser);
+  };
+
   const handleVerifyCodeSubmit = () => {
     if (userInputCode === simulatedCode || userInputCode === "123456") {
       // Create user
@@ -130,10 +178,13 @@ export default function AuthView({ lang, authType: initialAuthType, onNavigate, 
         status: 'active',
         role: 'user',
         isEmailVerified: true,
-        registrationDate: new Date().toISOString()
+        registrationDate: new Date().toISOString(),
+        p2pIntent: p2pIntent,
+        isKycVerified: false // Always start as unverified, they will activate it in their profile manually
       });
 
       setIsVerifying(false);
+      setShowKycScreen(false);
       onLogin(newUser);
     } else {
       setErrorMsg(lang === 'en' ? "Incorrect verification code. Please try again or use 123456." : "የማረጋገጫ ኮዱ የተሳሳተ ነው! እባክዎ እንደገና ይሞክሩ ወይም 123456 ይጠቀሙ።");
@@ -159,49 +210,181 @@ export default function AuthView({ lang, authType: initialAuthType, onNavigate, 
       {/* Verification Code Popup */}
       {isVerifying && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-amber-500/40 rounded-3xl p-8 max-w-md w-full relative">
-            <h3 className="text-xl font-bold text-white mb-4 text-center">{t.verifyEmailCode}</h3>
-            <p className="text-slate-400 text-sm text-center mb-6 leading-relaxed">
-              {t.verificationCodeSent}
-            </p>
+          <div className="bg-slate-950 border border-amber-500/30 rounded-3xl p-6 max-w-sm w-full relative">
+            {showKycScreen ? (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <span className="text-[9px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded font-black font-mono inline-block uppercase mx-auto mb-1">
+                    HIGH-SECURITY KYC NODE REGISTRATION
+                  </span>
+                  <h3 className="text-base font-extrabold text-white">🔒 Facial Biometrics & Official ID</h3>
+                  <p className="text-slate-400 text-[10px] mt-1 leading-relaxed">
+                    To satisfy P2P fiat trading security protocols, provide your face biometric scan and national ID card upload.
+                  </p>
+                </div>
 
-            {/* Verification Helper Modal Alert */}
-            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
-              <span className="text-xs text-slate-400 block uppercase font-bold tracking-wider mb-1">Simulated Email OTP Code</span>
-              <strong className="text-2xl text-amber-500 tracking-widest">{simulatedCode}</strong>
-            </div>
+                {/* 1. Facial Scan Area */}
+                <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-850 space-y-2.5">
+                  <span className="text-[9px] text-slate-400 font-extrabold block uppercase font-mono">1. Facial Verification Scan</span>
+                  
+                  {showAuthFaceScanner ? (
+                    <CameraFaceScanner
+                      lang={lang}
+                      onCapture={(img) => {
+                        setKycFacialPic(img);
+                        setShowAuthFaceScanner(false);
+                      }}
+                      onCancel={() => setShowAuthFaceScanner(false)}
+                    />
+                  ) : kycFacialPic ? (
+                    <div className="relative rounded-lg overflow-hidden border border-emerald-500/20 bg-slate-950 flex flex-col items-center p-2.5">
+                      <img referrerPolicy="no-referrer" src={kycFacialPic} className="w-12 h-12 rounded-full object-cover border border-emerald-500 shadow-md" alt="Biometric Face" />
+                      <span className="text-[9px] text-emerald-400 font-bold mt-1.5 flex items-center gap-1">✓ FACIAL DEPTH MAP SECURED</span>
+                      <button type="button" onClick={() => setKycFacialPic('')} className="text-[8px] text-slate-500 hover:text-red-450 mt-1 uppercase underline font-bold cursor-pointer font-mono">Retake Selfie</button>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-slate-950/60 rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-center">
+                      <div className="w-9 h-9 rounded-full bg-amber-500/10 border border-amber-500/25 flex items-center justify-center mb-1.5">
+                        <ShieldCheck className="w-4 h-4 text-amber-500" />
+                      </div>
+                      <p className="text-[8px] text-slate-500 font-medium mb-2 leading-none">Place face in frame.</p>
+                      
+                      <button
+                        type="button"
+                        onClick={() => setShowAuthFaceScanner(true)}
+                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-2.5 py-1 rounded text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer font-mono"
+                      >
+                        Scan Biometric Selfie
+                      </button>
+                    </div>
+                  )}
+                </div>
 
-            <div className="space-y-4">
-              <input
-                type="text"
-                maxLength={6}
-                placeholder="X X X X X X"
-                value={userInputCode}
-                onChange={(e) => setUserInputCode(e.target.value)}
-                className="w-full text-center text-xl font-bold text-white bg-slate-950 border border-slate-800 focus:border-amber-500 focus:outline-none rounded-xl py-3 tracking-widest placeholder-slate-700"
-              />
+                {/* 2. ID Card Upload Area */}
+                <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-850 space-y-2.5">
+                  <span className="text-[9px] text-slate-400 font-extrabold block uppercase font-mono">2. Official National ID Card</span>
+                  
+                  {showAuthIdScanner ? (
+                    <CameraIdScanner
+                      lang={lang}
+                      onCapture={(img) => {
+                        setKycIdPic(img);
+                        setShowAuthIdScanner(false);
+                      }}
+                      onCancel={() => setShowAuthIdScanner(false)}
+                    />
+                  ) : kycIdPic ? (
+                    <div className="p-2.5 rounded-lg border border-emerald-500/20 bg-slate-950 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {kycIdPic.startsWith('data:') ? (
+                          <img src={kycIdPic} className="w-10 h-7 rounded object-cover border border-slate-800" alt="Scanned Identity" />
+                        ) : (
+                          <div className="w-10 h-7 bg-slate-850 rounded border border-slate-800 flex items-center justify-center text-[6px] font-black font-mono text-emerald-400">PASSPORT</div>
+                        )}
+                        <span className="text-[9px] text-slate-300 font-mono truncate max-w-[150px]">Secure_ID_Scan.png</span>
+                      </div>
+                      <button type="button" onClick={() => setKycIdPic('')} className="text-[8px] text-red-400 hover:text-red-300 font-bold uppercase cursor-pointer hover:underline">Remove</button>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-slate-950/60 rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-center">
+                      <p className="text-[8px] text-slate-500 font-medium mb-2 leading-tight">Capture physical ID using device camera, or upload image file.</p>
+                      
+                      <div className="grid grid-cols-2 gap-2 w-full pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowAuthIdScanner(true)}
+                          className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-2 py-1 rounded text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1"
+                        >
+                          <Camera className="w-3 h-3 text-slate-950" strokeWidth={2.5} />
+                          <span>Camera ID Scanner</span>
+                        </button>
 
-              {errorMsg && (
-                <p className="text-xs text-red-400 font-semibold text-center mt-2 flex items-center justify-center gap-1">
-                  <ShieldAlert className="w-4 h-4" />
-                  {errorMsg}
+                        <button
+                          type="button"
+                          disabled={idUploading}
+                          onClick={() => {
+                            setIdUploading(true);
+                            setTimeout(() => {
+                              setKycIdPic('dummy-id-card-base64');
+                              setIdUploading(false);
+                            }, 1200);
+                          }}
+                          className="bg-slate-800 hover:bg-slate-700 text-white px-2 py-1 rounded text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+                        >
+                          {idUploading ? "Uploading..." : "Upload File"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleKycCompleteSubmit}
+                    className="w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-wider transition-all cursor-pointer text-center block"
+                  >
+                    Complete Security Registration
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowKycScreen(false);
+                      setIsVerifying(false);
+                    }}
+                    className="w-full text-slate-500 hover:text-slate-350 text-[9px] py-1 text-center font-bold uppercase tracking-wider block cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h3 className="text-xl font-bold text-white mb-4 text-center">{t.verifyEmailCode}</h3>
+                <p className="text-slate-400 text-sm text-center mb-6 leading-relaxed">
+                  {t.verificationCodeSent}
                 </p>
-              )}
 
-              <button
-                onClick={handleVerifyCodeSubmit}
-                className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-bold py-3.5 rounded-xl uppercase tracking-wider test-sm cursor-pointer hover:scale-[1.01] active:translate-y-0.5 transition-all mt-4"
-              >
-                {t.verifyBtn}
-              </button>
+                {/* Verification Helper Modal Alert */}
+                <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+                  <span className="text-xs text-slate-400 block uppercase font-bold tracking-wider mb-1">Simulated Email OTP Code</span>
+                  <strong className="text-2xl text-amber-500 tracking-widest">{simulatedCode}</strong>
+                </div>
 
-              <button
-                onClick={() => setIsVerifying(false)}
-                className="w-full text-slate-400 hover:text-slate-200 text-xs py-2 block text-center cursor-pointer"
-              >
-                {t.cancel}
-              </button>
-            </div>
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    placeholder="X X X X X X"
+                    value={userInputCode}
+                    onChange={(e) => setUserInputCode(e.target.value)}
+                    className="w-full text-center text-xl font-bold text-white bg-slate-950 border border-slate-800 focus:border-amber-500 focus:outline-none rounded-xl py-3 tracking-widest placeholder-slate-700"
+                  />
+
+                  {errorMsg && (
+                    <p className="text-xs text-red-400 font-semibold text-center mt-2 flex items-center justify-center gap-1">
+                      <ShieldAlert className="w-4 h-4" />
+                      {errorMsg}
+                    </p>
+                  )}
+
+                  <button
+                    onClick={handleVerifyCodeSubmit}
+                    className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-bold py-3.5 rounded-xl uppercase tracking-wider test-sm cursor-pointer hover:scale-[1.01] active:translate-y-0.5 transition-all mt-4"
+                  >
+                    {t.verifyBtn}
+                  </button>
+
+                  <button
+                    onClick={() => setIsVerifying(false)}
+                    className="w-full text-slate-400 hover:text-slate-200 text-xs py-2 block text-center cursor-pointer"
+                  >
+                    {t.cancel}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -391,6 +574,22 @@ export default function AuthView({ lang, authType: initialAuthType, onNavigate, 
                   className="w-full bg-slate-950 border border-slate-850 focus:border-amber-500 focus:outline-none rounded-xl text-white text-xs pl-11 pr-4 py-3 transition-all"
                 />
               </div>
+            </div>
+
+            {/* P2P Capabilities & High Security Verification Option */}
+            <div className="bg-slate-950/80 border border-slate-850 p-4 rounded-2xl">
+              <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-300 font-bold select-none">
+                <input
+                  type="checkbox"
+                  checked={p2pIntent}
+                  onChange={(e) => setP2pIntent(e.target.checked)}
+                  className="rounded border-slate-800 text-amber-500 focus:ring-transparent bg-slate-900 mt-0.5"
+                />
+                <div className="space-y-0.5">
+                  <span className="text-white block">🛒 Activate P2P Buy & Sell escrows</span>
+                  <span className="text-[10px] text-slate-500 font-medium block">Check this if you plan to buy or sell USD for ETB. Requires secure biometric face scanning and ID card validation.</span>
+                </div>
+              </label>
             </div>
 
             <div>
